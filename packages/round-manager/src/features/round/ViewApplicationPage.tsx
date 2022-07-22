@@ -34,7 +34,7 @@ export default function ViewApplicationPage() {
             </Link>
           </div>
           <div className="flow-root">
-            <h1 className="float-left text-[32px] mb-6">{JSON.stringify(application) || "..."}</h1>
+            <h1 className="float-left text-[32px] mb-6">{application?.project.title || "..."}</h1>
           </div>
           <hr />
         </header>
