@@ -2,8 +2,7 @@ import {
   ArrowNarrowLeftIcon,
   CheckIcon,
   MailIcon,
-  XIcon,
-  EyeOffIcon
+  XIcon
 } from "@heroicons/react/solid"
 import { useEffect, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
@@ -54,13 +53,14 @@ export default function ViewApplicationPage() {
     }),
   })
 
-  const [answerBlocks, setAnswerBlocks] = useState<any | undefined>([]);
+  const [answerBlocks, setAnswerBlocks] = useState<any>([]);
   useEffect(() => {
 
     let _answerBlocks: any = []
 
     // Iterate through application answers and decrypt PII information
     const decryptAnswers = () => {
+      
       application?.answers?.forEach(async (_answerBlock, index) => {
 
         if (_answerBlock.encryptedAnswer) {
@@ -84,13 +84,8 @@ export default function ViewApplicationPage() {
             _answerBlock['answer'] = decryptedString
           }
           catch (error) {
+            _answerBlock['answer'] = 'hidden'
             console.log(error)
-            return(
-              <span className="text-grey-400">
-                <EyeOffIcon className="h-3 w-3 inline mr-2 mb-1"/>
-                <span>Hidden</span>
-              </span>
-            )
           }
         }
 
@@ -101,7 +96,8 @@ export default function ViewApplicationPage() {
     }
 
     decryptAnswers();
-  });
+  }, [application?.answers]);
+  
 
   const [updateGrantApplication, {
     isLoading: updating,
