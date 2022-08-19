@@ -181,7 +181,11 @@ export interface GrantApplication {
   answers?: Array<{
     questionId: Number,
     question: string,
-    answer: string
+    answer?: string,
+    encryptedAnswer?: {
+      encryptedString: string,
+      encryptedSymmetricKey: string
+    },
   }>;
   /**
    * Pointer to the list of approved/rejected grant applications in a decentralized storage

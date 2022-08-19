@@ -1,4 +1,10 @@
-import { ArrowNarrowLeftIcon, CheckIcon, MailIcon, XIcon } from "@heroicons/react/solid"
+import {
+  ArrowNarrowLeftIcon,
+  CheckIcon,
+  MailIcon,
+  XIcon,
+  EyeOffIcon
+} from "@heroicons/react/solid"
 import { useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import {
@@ -14,7 +20,8 @@ import { ReactComponent as TwitterIcon } from "../../assets/twitter-logo.svg"
 import { ReactComponent as GithubIcon } from "../../assets/github-logo.svg"
 import Footer from "../common/Footer"
 import { datadogLogs } from "@datadog/browser-logs"
-
+import { Lit } from "../api/lit"
+import { utils } from "ethers"
 
 type ApplicationStatus = "APPROVED" | "REJECTED"
 
@@ -27,7 +34,7 @@ export default function ViewApplicationPage() {
   const [openModal, setOpenModal] = useState(false)
 
   const { roundId, id } = useParams()
-  const { address, provider, signer } = useWallet()
+  const { chain, address, provider, signer } = useWallet()
   const navigate = useNavigate()
 
   const {
@@ -84,9 +91,86 @@ export default function ViewApplicationPage() {
     setTimeout(() => setReviewDecision(undefined), 500)
   }
 
-  const getAnswer = (question: string) => {
-    return application?.answers!.find((answer) => answer.question === question)?.answer || "N/A"
+  const getAnswer = async (question: string) => {
+
+    const answerBlock = application?.answers!.find((answer) => answer.question === question)
+    
+    if (!answerBlock) return "N/A";
+    
+    if (answerBlock.answer) return answerBlock.answer
+    
+    if (answerBlock.encryptedAnswer) {
+      try {
+        const encryptedAnswer = answerBlock.encryptedAnswer
+
+        const base64EncryptedString = encryptedAnswer.encryptedString
+
+        let response = await fetch(base64EncryptedString)
+        let encryptedString: any = await response.blob()
+                
+        const lit = new Lit({
+          chain: chain.name.toLowerCase(),
+          contract: utils.getAddress(roundId!),
+        })
+
+        const decryptedString = await lit.decryptString(
+          encryptedString,
+          encryptedAnswer.encryptedSymmetricKey
+        )
+
+        return decryptedString
+
+        // return answerBlock.encryptedAnswer.encryptedString
+        
+      } catch {
+        return(
+          <span className="text-grey-400">
+            <EyeOffIcon className="h-3 w-3 inline mr-2 mb-1"/>
+            <span>Hidden</span>
+          </span>
+        )
+      }
+    }
+
+    return "N/A";
   }
+
+
+  // const shit = async (question: string) => {
+
+  //   if(!application || !application.answers )  return;
+  //   const answerBlock = application?.answers!.find((answer) => answer.question === question)
+  //   if(!answerBlock) return ;
+    
+  //   const encryptedAnswer = answerBlock.encryptedAnswer
+    
+  //   const base64EncryptedString = encryptedAnswer!.encryptedString
+    
+  //   let response = await fetch(base64EncryptedString)
+    
+  //   let encryptedString: any = await response.blob()
+    
+  //   const lit = new Lit({
+  //     chain: chain.name.toLowerCase(),
+  //     contract: utils.getAddress(roundId!),
+  //   })
+
+  //   try {
+  //     const decryptedString = await lit.decryptString(
+  //       encryptedString,
+  //       encryptedAnswer!.encryptedSymmetricKey
+  //     )
+  //     console.log("=====> A6", decryptedString)
+      
+  //     return decryptedString;
+  //   } catch(e) {
+  //     console.error(e)
+  //     return ""
+  //   }
+    
+  // }
+
+  // shit("Is your project cool enough to apply ?")
 
   return (
     <>
@@ -187,7 +271,7 @@ export default function ViewApplicationPage() {
               <p className="text-base mb-6">{getAnswer("Profit2022")}</p>
 
               <h2 className="text-xs mb-2">Team Size</h2>
-              <p className="text-base mb-6">{getAnswer("Team Size")}</p>
+              <p className="text-base mb-6">{getAnswer("Is your project cool enough to apply ?")}</p>
             </div>
             <div className="sm:basis-1/4 text-center sm:ml-3"></div>
           </div>
