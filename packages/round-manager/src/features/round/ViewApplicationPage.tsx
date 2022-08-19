@@ -58,7 +58,7 @@ export default function ViewApplicationPage() {
 
   useEffect(() => {
     // Iterate through application answers and decrypt PII information
-    const decryptAnswers = () => {
+    const decryptAnswers = async () => {
 
       console.log("====> Total questions in application", application?.answers?.length);
 
@@ -66,43 +66,42 @@ export default function ViewApplicationPage() {
 
       const PREFIX = 'data:application/octet-stream;base64'
 
-      application?.answers?.forEach(async (_answerBlock: AnswerBlock) => {
+      if (application?.answers && application.answers.length > 0) {
+        for (let _answerBlock of application.answers) {
+          if (_answerBlock.encryptedAnswer) {
+            try {
+              const encryptedAnswer = _answerBlock.encryptedAnswer
+              const base64EncryptedString = [PREFIX, encryptedAnswer.ciphertext].join(',')
 
-        if (_answerBlock.encryptedAnswer) {
-          try {
-            const encryptedAnswer = _answerBlock.encryptedAnswer
-            const base64EncryptedString = [PREFIX , encryptedAnswer.ciphertext].join(',')
+              const response = await fetch(base64EncryptedString)
+              const encryptedString: any = await response.blob()
 
-            const response = await fetch(base64EncryptedString)
-            const encryptedString: any = await response.blob()
-
-            const lit = new Lit({
-              chain: chain.name.toLowerCase(),
-              contract: utils.getAddress(roundId!),
-            })
+              const lit = new Lit({
+                chain: chain.name.toLowerCase(),
+                contract: utils.getAddress(roundId!),
+              })
 
             const decryptedString = await lit.decryptString(
               encryptedString,
               encryptedAnswer.encryptedSymmetricKey
             )
 
-            _answerBlock = {
-              ..._answerBlock,
-              'answer': decryptedString
+              _answerBlock = {
+                ..._answerBlock,
+                'answer': decryptedString
+              }
+            } catch (error) {
+              _answerBlock = {
+                ..._answerBlock,
+                'answer': 'hidden'
+              }
             }
           }
-          catch (error) {
-            _answerBlock = {
-              ..._answerBlock,
-              'answer': 'hidden'
-            }
-          }
+
+          _answerBlocks.push(_answerBlock)
+
         }
-
-        _answerBlocks.push(_answerBlock)
-
-      });
-
+      }
       setAnswerBlocks(_answerBlocks);
 
     }
@@ -111,7 +110,7 @@ export default function ViewApplicationPage() {
 
     console.log("====> after invoking decryptAnswers", answerBlocks);
 
-  }, []);
+  }, [application, isLoading]);
 
 
   const [updateGrantApplication, {
