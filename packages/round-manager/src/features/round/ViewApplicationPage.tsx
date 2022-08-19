@@ -5,7 +5,7 @@ import {
   XIcon,
   EyeOffIcon
 } from "@heroicons/react/solid"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import {
   useListGrantApplicationsQuery,
@@ -22,6 +22,7 @@ import Footer from "../common/Footer"
 import { datadogLogs } from "@datadog/browser-logs"
 import { Lit } from "../api/lit"
 import { utils } from "ethers"
+import { AnswerBlock } from "../api/types"
 
 type ApplicationStatus = "APPROVED" | "REJECTED"
 
@@ -52,6 +53,55 @@ export default function ViewApplicationPage() {
       round: data?.find((round) => round.id === roundId)
     }),
   })
+
+  const [answerBlocks, setAnswerBlocks] = useState<any | undefined>([]);
+  useEffect(() => {
+
+    let _answerBlocks: any = []
+
+    // Iterate through application answers and decrypt PII information
+    const decryptAnswers = () => {
+      application?.answers?.forEach(async (_answerBlock, index) => {
+
+        if (_answerBlock.encryptedAnswer) {
+          try {
+            const encryptedAnswer = _answerBlock.encryptedAnswer
+            const base64EncryptedString = encryptedAnswer.encryptedString
+
+            const response = await fetch(base64EncryptedString)
+            const encryptedString: any = await response.blob()
+
+            const lit = new Lit({
+              chain: chain.name.toLowerCase(),
+              contract: utils.getAddress(roundId!),
+            })
+
+            const decryptedString = await lit.decryptString(
+              encryptedString,
+              encryptedAnswer.encryptedSymmetricKey
+            )
+
+            _answerBlock['answer'] = decryptedString
+          }
+          catch (error) {
+            console.log(error)
+            return(
+              <span className="text-grey-400">
+                <EyeOffIcon className="h-3 w-3 inline mr-2 mb-1"/>
+                <span>Hidden</span>
+              </span>
+            )
+          }
+        }
+
+        answerBlocks.push(_answerBlock)
+      });
+
+      setAnswerBlocks(_answerBlocks);
+    }
+
+    decryptAnswers();
+  });
 
   const [updateGrantApplication, {
     isLoading: updating,
@@ -91,86 +141,9 @@ export default function ViewApplicationPage() {
     setTimeout(() => setReviewDecision(undefined), 500)
   }
 
-  const getAnswer = async (question: string) => {
-
-    const answerBlock = application?.answers!.find((answer) => answer.question === question)
-    
-    if (!answerBlock) return "N/A";
-    
-    if (answerBlock.answer) return answerBlock.answer
-    
-    if (answerBlock.encryptedAnswer) {
-      try {
-        const encryptedAnswer = answerBlock.encryptedAnswer
-
-        const base64EncryptedString = encryptedAnswer.encryptedString
-
-        let response = await fetch(base64EncryptedString)
-        let encryptedString: any = await response.blob()
-                
-        const lit = new Lit({
-          chain: chain.name.toLowerCase(),
-          contract: utils.getAddress(roundId!),
-        })
-
-        const decryptedString = await lit.decryptString(
-          encryptedString,
-          encryptedAnswer.encryptedSymmetricKey
-        )
-
-        return decryptedString
-
-        // return answerBlock.encryptedAnswer.encryptedString
-        
-      } catch {
-        return(
-          <span className="text-grey-400">
-            <EyeOffIcon className="h-3 w-3 inline mr-2 mb-1"/>
-            <span>Hidden</span>
-          </span>
-        )
-      }
-    }
-
-    return "N/A";
+  const getAnswer = (question: string) => {
+    return answerBlocks.find((answer: AnswerBlock) => answer.question === question)?.answer || "N/A"
   }
-
-
-  // const shit = async (question: string) => {
-
-  //   if(!application || !application.answers )  return;
-  //   const answerBlock = application?.answers!.find((answer) => answer.question === question)
-  //   if(!answerBlock) return ;
-    
-  //   const encryptedAnswer = answerBlock.encryptedAnswer
-    
-  //   const base64EncryptedString = encryptedAnswer!.encryptedString
-    
-  //   let response = await fetch(base64EncryptedString)
-    
-  //   let encryptedString: any = await response.blob()
-    
-  //   const lit = new Lit({
-  //     chain: chain.name.toLowerCase(),
-  //     contract: utils.getAddress(roundId!),
-  //   })
-
-  //   try {
-  //     const decryptedString = await lit.decryptString(
-  //       encryptedString,
-  //       encryptedAnswer!.encryptedSymmetricKey
-  //     )
-  //     console.log("=====> A6", decryptedString)
-      
-  //     return decryptedString;
-  //   } catch(e) {
-  //     console.error(e)
-  //     return ""
-  //   }
-    
-  // }
-
-  // shit("Is your project cool enough to apply ?")
 
   return (
     <>
