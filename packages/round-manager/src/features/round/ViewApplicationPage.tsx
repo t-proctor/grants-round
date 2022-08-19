@@ -1,5 +1,10 @@
-import { ArrowNarrowLeftIcon, CheckIcon, MailIcon, XIcon } from "@heroicons/react/solid"
-import { useState } from "react"
+import {
+  ArrowNarrowLeftIcon,
+  CheckIcon,
+  MailIcon,
+  XIcon
+} from "@heroicons/react/solid"
+import { useEffect, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import {
   useListGrantApplicationsQuery,
@@ -14,7 +19,9 @@ import { ReactComponent as TwitterIcon } from "../../assets/twitter-logo.svg"
 import { ReactComponent as GithubIcon } from "../../assets/github-logo.svg"
 import Footer from "../common/Footer"
 import { datadogLogs } from "@datadog/browser-logs"
-
+import { Lit } from "../api/lit"
+import { utils } from "ethers"
+import { AnswerBlock } from "../api/types"
 
 type ApplicationStatus = "APPROVED" | "REJECTED"
 
@@ -27,7 +34,7 @@ export default function ViewApplicationPage() {
   const [openModal, setOpenModal] = useState(false)
 
   const { roundId, id } = useParams()
-  const { address, provider, signer } = useWallet()
+  const { chain, address, provider, signer } = useWallet()
   const navigate = useNavigate()
 
   const {
@@ -45,6 +52,67 @@ export default function ViewApplicationPage() {
       round: data?.find((round) => round.id === roundId)
     }),
   })
+
+
+  const [answerBlocks, setAnswerBlocks] = useState<AnswerBlock[]>();
+
+  useEffect(() => {
+    // Iterate through application answers and decrypt PII information
+    const decryptAnswers = () => {
+
+      console.log("====> Total questions in application", application?.answers?.length);
+
+      let _answerBlocks: AnswerBlock[] = []
+
+      const PREFIX = 'data:application/octet-stream;base64'
+
+      application?.answers?.forEach(async (_answerBlock: AnswerBlock) => {
+
+        if (_answerBlock.encryptedAnswer) {
+          try {
+            const encryptedAnswer = _answerBlock.encryptedAnswer
+            const base64EncryptedString = [PREFIX , encryptedAnswer.ciphertext].join(',')
+
+            const response = await fetch(base64EncryptedString)
+            const encryptedString: any = await response.blob()
+
+            const lit = new Lit({
+              chain: chain.name.toLowerCase(),
+              contract: utils.getAddress(roundId!),
+            })
+
+            const decryptedString = await lit.decryptString(
+              encryptedString,
+              encryptedAnswer.encryptedSymmetricKey
+            )
+
+            _answerBlock = {
+              ..._answerBlock,
+              'answer': decryptedString
+            }
+          }
+          catch (error) {
+            _answerBlock = {
+              ..._answerBlock,
+              'answer': 'hidden'
+            }
+          }
+        }
+
+        _answerBlocks.push(_answerBlock)
+
+      });
+
+      setAnswerBlocks(_answerBlocks);
+
+    }
+
+    decryptAnswers();
+
+    console.log("====> after invoking decryptAnswers", answerBlocks);
+
+  }, []);
+
 
   const [updateGrantApplication, {
     isLoading: updating,
@@ -85,7 +153,17 @@ export default function ViewApplicationPage() {
   }
 
   const getAnswer = (question: string) => {
-    return application?.answers!.find((answer) => answer.question === question)?.answer || "N/A"
+
+    console.log("====> getAnswer question", question)
+    console.log("====> getAnswer answerBlocks size", answerBlocks?.length, answerBlocks)
+
+    const answerBlock = answerBlocks?.find((answerBlock: AnswerBlock) => answerBlock.question === question);
+    const answer = answerBlock ? answerBlock.answer : "N/A";
+
+    if(question === "Is your project cool enough to apply ?")
+      console.log("****", answer)
+
+    return answer;
   }
 
   return (
@@ -187,7 +265,7 @@ export default function ViewApplicationPage() {
               <p className="text-base mb-6">{getAnswer("Profit2022")}</p>
 
               <h2 className="text-xs mb-2">Team Size</h2>
-              <p className="text-base mb-6">{getAnswer("Team Size")}</p>
+              <p className="text-base mb-6">{getAnswer("Is your project cool enough to apply ?")}</p>
             </div>
             <div className="sm:basis-1/4 text-center sm:ml-3"></div>
           </div>

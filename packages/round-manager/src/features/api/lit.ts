@@ -109,7 +109,7 @@ export class Lit {
    * @returns decrypted string
    */
   async decryptString(
-    encryptedStr: string,
+    encryptedStr: string|Blob,
     encryptedSymmetricKey: string
   ) {
     if (!this.litNodeClient) {
